@@ -1,5 +1,5 @@
 /** 
- *  MediaRenderer Player v2.1.1
+ *  MediaRenderer Player v2.5.0
  *
  *  Author: SmartThings - Ulises Mujica (Ule)
  *
@@ -9,9 +9,13 @@
 preferences {
         input(name: "customDelay", type: "enum", title: "Delay before msg (seconds)", options: ["0","1","2","3","4","5"])
         input(name: "actionsDelay", type: "enum", title: "Delay between actions (seconds)", options: ["0","1","2","3"])
+        input "noDelay", "bool", title: "Avoid Secure Delay", required: false, defaultValue: false
         input(name: "refreshFrequency", type: "enum", title: "Refresh frequency (minutes)", options:[0:"Auto",3:"3",5:"5",10:"10",15:"15",20:"20"])
         input "externalTTS", "bool", title: "Use External Text to Speech", required: false, defaultValue: false
         input "ttsApiKey", "text", title: "TTS Key", required: false
+        input(name: "genre", type: "enum", title: "Music Genre", defaultValue:"Smooth Jazz", options:getGenres())
+        input "useGenres", "bool", title: "Multiple Genres Instead of Genre", required: false, defaultValue: false
+        input "genres", "text", title: "Multiple Genres, Write Exact Like Music Genre List", required: false, description:"genre1,genre2,genre3"
 }
 metadata {
 	// Automatically generated. Make future change here.
@@ -29,6 +33,14 @@ metadata {
 		attribute "transportUri", "string"
 		attribute "trackNumber", "string"
 		attribute "doNotDisturb", "string"
+        attribute "btnMode", "string"
+        attribute "udn", "string"
+        attribute "partyState", "string"
+        attribute "x_NumberOfListeners", "string"
+        attribute "singerSessionID", "string"
+        attribute "sessionID", "string"
+        
+        
 		
 
 
@@ -49,8 +61,15 @@ metadata {
 		command "playTextAndResume", ["string","json_object","number"]
 		command "setDoNotDisturb", ["string"]
 		command "switchDoNotDisturb"
+        command "switchBtnMode"
 		command "speak", ["string"]
 		command "playTrack", ["string","string"]
+        command "playStation", ["number","number"]
+        command "previousStation"
+        command "nextStation"
+        command "previousGenre"
+        command "nextGenre"
+        command "party", ["string"]
 	}
 
 	// Main
@@ -59,28 +78,46 @@ metadata {
 		state "stopped", label:'Stopped', action:"music Player.play", icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
 		state "paused", label:'Paused', action:"music Player.play", icon:"st.Electronics.electronics16", nextState:"playing", backgroundColor:"#ffffff"
 		state "no_media_present", label:'No Media', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
+        state "no_media_present_listening", label:'Listening', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
         state "no_device_present", label:'No Present', icon:"st.Electronics.electronics16", backgroundColor:"#b6b6b4"
 		state "grouped", label:'Grouped', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
 	}
-
+/*
 	// Row 1
 	standardTile("nextTrack", "device.status", width: 1, height: 1, decoration: "flat") {
 		state "next", label:'', action:"music Player.nextTrack", icon:"st.sonos.next-btn", backgroundColor:"#ffffff"
 	}
 	standardTile("play", "device.status", width: 1, height: 1, decoration: "flat") {
 		state "default", label:'', action:"music Player.play", icon:"st.sonos.play-btn", nextState:"playing", backgroundColor:"#ffffff"
-		state "grouped", label:'', action:"music Player.play", icon:"st.sonos.play-btn", backgroundColor:"#ffffff"
 	}
 	standardTile("previousTrack", "device.status", width: 1, height: 1, decoration: "flat") {
 		state "previous", label:'', action:"music Player.previousTrack", icon:"st.sonos.previous-btn", backgroundColor:"#ffffff"
 	}
-
+    */
+  // Row 1a
+	standardTile("nextTrack", "device.btnMode", width: 1, height: 1, decoration: "flat") {
+        state "default", label:'', action:"nextTrack", icon:"st.sonos.next-btn", backgroundColor:"#ffffff",nextState:"default"
+        state "station", label:'Next Station', action:"nextStation", icon:"http://urbansa.com/icons/next-btn@2x.png", backgroundColor:"#ffffff",nextState:"station"
+        state "genre", label:'Next Genre', action:"nextGenre", icon:"http://urbansa.com/icons/next-btn@2x.png", backgroundColor:"#ffffff",nextState:"genre"
+	}
+	standardTile("play", "device.btnMode", width: 1, height: 1, decoration: "flat") {
+		state "default", label:'', action:"play", icon:"st.sonos.play-btn", nextState:"default", backgroundColor:"#ffffff"
+        state "station", label:'Play Station', action:"playStation", icon:"http://urbansa.com/icons/play-btn@2x.png", nextState:"station", backgroundColor:"#ffffff"
+        state "genre", label:'Play Station', action:"playStation", icon:"http://urbansa.com/icons/play-btn@2x.png", nextState:"genre", backgroundColor:"#ffffff"
+	}
+	standardTile("previousTrack", "device.btnMode", width: 1, height: 1, decoration: "flat") {
+		state "default", label:'', action:"previousTrack", icon:"st.sonos.previous-btn", backgroundColor:"#ffffff",nextState:"default"
+        state "station", label:'Prev Station', action:"previousStation", icon:"http://urbansa.com/icons/previous-btn@2x.png", backgroundColor:"#ffffff",nextState:"station"
+        state "genre", label:'Prev Genre', action:"previousGenre", icon:"http://urbansa.com/icons/previous-btn@2x.png", backgroundColor:"#ffffff",nextState:"genre"
+	}
+    
 	// Row 2
 	standardTile("status", "device.status", width: 1, height: 1, decoration: "flat", canChangeIcon: true) {
 		state "playing", label:'Playing', action:"music Player.stop", icon:"st.Electronics.electronics16", nextState:"paused", backgroundColor:"#ffffff"
 		state "stopped", label:'Stopped', action:"music Player.play", icon:"st.Electronics.electronics16", nextState:"playing", backgroundColor:"#ffffff"
 		state "no_media_present", label:'No Media', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
-		state "no_device_present", label:'No Present', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
+		state "no_media_present_listening", label:'Listening', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
+        state "no_device_present", label:'No Present', icon:"st.Electronics.electronics16", backgroundColor:"#ffffff"
 		state "paused", label:'Paused', action:"music Player.play", icon:"st.Electronics.electronics16", nextState:"playing", backgroundColor:"#ffffff"
 	}
 	standardTile("stop", "device.status", width: 1, height: 1, decoration: "flat") {
@@ -93,7 +130,7 @@ metadata {
 	}
 
 	// Row 3
-	controlTile("levelSliderControl", "device.level", "slider", height: 1, width: 3, inactiveLabel: false) {
+	controlTile("levelSliderControl", "device.level", "slider", height: 1, width: 1, inactiveLabel: false) {
 		state "level", action:"tileSetLevel", backgroundColor:"#ffffff"
 	}
 
@@ -113,18 +150,28 @@ metadata {
         state "on_playing", label:"MSG on Stopped", action:"switchDoNotDisturb", icon:"st.alarm.beep.beep",nextState:"off_playing"
         state "off_playing", label:"MSG on Playing", action:"switchDoNotDisturb", icon:"st.alarm.beep.beep",nextState:"off"
 	}
-
-	
-
+    standardTile("btnMode", "device.btnMode", width: 1, height: 1, decoration: "flat", canChangeIcon: true) {
+		state "default", label:"Normal", action:"switchBtnMode", icon:"st.Electronics.electronics14",nextState:"station"
+		state "station", label:"Station", action:"switchBtnMode", icon:"st.Entertainment.entertainment2",nextState:"genre"
+        state "genre", label:"Genre", action:"switchBtnMode", icon:"st.Electronics.electronics1",nextState:"normal"
+	}
+    
+    standardTile("partyState", "device.partyState", width: 1, height: 1, decoration: "flat", canChangeIcon: true) {
+		state "default", label:'Not Supported', icon:"st.Electronics.electronics19", backgroundColor:"#ffffff"
+        state "SINGING", label:'Singing', icon:"st.Electronics.electronics19", backgroundColor:"#ffffff"
+		state "IDLE", label:'Idle',  icon:"st.Electronics.electronics19", backgroundColor:"#ffffff"
+		state "LISTENING", label:'Listening', icon:"st.Electronics.electronics19", backgroundColor:"#ffffff"
+	}
 
 	main "main"
 
 	details([
 		"previousTrack","play","nextTrack",
-		"status","stop","mute",
-		"levelSliderControl",
+      /*  "previousTrackGenre","playGenre","nextTrackGenre",*/
+		"levelSliderControl","stop","mute",
 		"currentSong",
-		"refreshPlayer", "doNotDisturb"
+		"status", "doNotDisturb","btnMode",
+		"partyState","refreshPlayer"
 	])
 }
 
@@ -152,10 +199,32 @@ def parse(description) {
 				updateSid(sid)
 			}
 			else if (msg.xml) {
-
+            	def node
+                
+            // Process response to propertyset
+				node = msg.xml?.property
+				if(node?.X_NumberOfListeners?.text()) sendEvent(name: "x_NumberOfListeners", value: node.X_NumberOfListeners.text(), description: "$device.displayName x_NumberOfListeners is ${node.X_NumberOfListeners.text()}")
+                if(node?.X_PartyState?.text()) sendEvent(name: "partyState", value: node.X_PartyState.text(), description: "$device.displayName x_PartyState is ${node.X_PartyState.text()}")
+               
+               
+               node = msg.xml?.Body.X_StartResponse
+				if(node?.SingerSessionID?.text()) sendEvent(name: "singerSessionID", value: node.SingerSessionID.text(), description: "$device.displayName SingerSessionID is ${node.SingerSessionID.text()}")
+                //if(node?.X_PartyState?.text()) sendEvent(name: "x_PartyState", value: node.X_PartyState.text(), description: "$device.displayName x_PartyState is ${node.X_PartyState.text()}")
+               
+               
+               
+				// Process response to getState()
+				node = msg.xml?.Body?.X_GetStateResponse
+				if(node?.PartyState?.text()) sendEvent(name: "partyState", value: node.PartyState.text(), description: "$device.displayName partyState is ${node.PartyState.text()}")
+                if(node?.PartyMode?.text()) sendEvent(name: "partyMode", value: node.PartyMode.text(), description: "$device.displayName partyMode is ${node.PartyMode.text()}")
+                if(node?.PartySong?.text()) sendEvent(name: "partySong", value: node.PartySong.text(), description: "$device.displayName PartySong is ${node.PartySong.text()}")
+                if(node?.SessionID?.text()) sendEvent(name: "sessionID", value: node.SessionID.text(), description: "$device.displayName SessionID is ${node.SessionID.text()}")
+                if(node?.SingerSessionID?.text()) sendEvent(name: "singerSessionID", value: node.SingerSessionID.text(), description: "$device.displayName SingerSessionID is ${node.SingerSessionID.text()}")
+                if(node?.ListenerList?.text()) sendEvent(name: "listenerList", value: node.ListenerList.text(), description: "$device.displayName ListenerList is ${node.ListenerList.text()}")
+                if(node?.SingerUUID?.text()) sendEvent(name: "singerUUID", value: node.SingerUUID.text(), description: "$device.displayName SingerUUID is ${node.SingerUUID.text()}")
+                
+                
 				// Process response to getVolume()
-				def node = msg.xml.Body.GetVolumeResponse
-
 				node = msg.xml.Body.GetVolumeResponse
 				if (node.size()) {
 					def currentVolume = node.CurrentVolume.text()
@@ -170,7 +239,8 @@ def parse(description) {
 					if (currentStatus) {
 						state.lastStatusTime = new Date().time
 						if (currentStatus != "TRANSITIONING") {
-							sendEvent(name: "status", value: currentStatus, data: [source: 'xml.Body.GetTransportInfoResponse'])
+                        	if (currentStatus == "no_media_present" && device.currentValue("partyState") == "LISTENING") currentStatus =  statusText('LISTENING')
+                            sendEvent(name: "status", value: currentStatus, displayed: false)
 							sendEvent(name: "switch", value: currentStatus=="playing" ? "on" : "off", displayed: false)
 
 						}
@@ -201,11 +271,16 @@ def parse(description) {
                     if (currentStatus) {
 						state.lastStatusTime = new Date().time
 						if (currentStatus != "TRANSITIONING") {
-							updateDataValue('currentStatus', currentStatus)
+							//updateDataValue('currentStatus', currentStatus)
+                            if (currentStatus == "no_media_present"){
+                            	sendEvent(name: "trackDescription",value: "",descriptionText: "", displayed: false)
+                                if (device.currentValue("partyState") == "LISTENING") currentStatus = statusText('LISTENING')
+                            }
 							sendEvent(name: "status", value: currentStatus, data: currentStatus, displayed: false)
 							sendEvent(name: "switch", value: currentStatus=="playing" ? "on" : "off", displayed: false)
 						}
-						if (currentStatus == "no_media_present") {sendEvent(name: "trackDescription",value: "",descriptionText: "", displayed: false)}
+						//if (currentStatus == "no_media_present") {sendEvent(name: "trackDescription",value: "",descriptionText: "", displayed: false)}
+                        
 					}
 
 					// Volume level 
@@ -260,7 +335,6 @@ def parse(description) {
 							metaData = metaData.contains("pxn:ContentSourceType") &&  !metaData.contains("xmlns:pxn") ? metaData.replace("<DIDL-Lite"," <DIDL-Lite xmlns:pxn=\"urn:schemas-panasonic-com:pxn\"") : metaData
                             metaData = metaData != "<DIDL-Lite></DIDL-Lite><DIDL-Lite></DIDL-Lite>" ? metaData : null 
                             def parsedMetaData
-	
                             try {
 								if (metaData){
                                 	parsedMetaData = parseXml(metaData)
@@ -270,7 +344,7 @@ def parse(description) {
                                 log.debug "Help us to fix this error, report this incident"
                                 log.debug metaData
                             }
-							//log.info parsedMetaData
+
 							if (parsedMetaData){
                                 def trackXml = parsedMetaData;
                                 // Song properties
@@ -366,6 +440,7 @@ def parse(description) {
 
 def installed() {
 	sendEvent(name:"model",value:getDataValue("model"),isStateChange:true)
+    sendEvent(name:"udn",value:getDataValue("udn"),isStateChange:true)
 //	def result = []
 //    result << delayAction(10000)
 //	result << refresh()
@@ -381,35 +456,36 @@ def off(){
 }
 
 def poll() {
-log.trace "poll()"
 	timer()
 }
 
 def timer(){
     def eventTime = new Date().time
-	state.gapTime = refreshFrequency > 0 ? (refreshFrequency? (refreshFrequency as Integer):0) * 60  : (parent.refreshMRInterval? (parent.refreshMRInterval as Integer):0) * 60 
+	state.gapTime = refreshFrequency > 0 ? (refreshFrequency? (refreshFrequency as Integer):0) * 60  : (parent.updateMRInterval? (parent.updateMRInterval as Integer):0) * 60 
     if ((state.lastRefreshTime ?:0) + (state.lastChange ? state.gapTime * 1000 : 300000)  <=  eventTime ){
-    	refresh()
+        refresh()
     }
 }
 def refresh() {
+	sendEvent(name:"udn",value:getDataValue("udn"),isStateChange:true)
     def eventTime = new Date().time
 
     if( eventTime > state.secureEventTime ?:0)
     {
+        //installed()
         if ((state.lastRefreshTime ?: 0) > (state.lastStatusTime ?:0)){
             sendEvent(name: "status", value: "no_device_present", data: "no_device_present", displayed: false)
         }
         state.lastRefreshTime = eventTime
-        log.trace "Refresh()"
         def result = []
         //result << unsubscribe()
         //result << delayAction(10000)
         result << subscribe()
-        result << getCurrentStatus()
+      	result << getCurrentStatus()
         result << getVolume()
         result << getPlayMode()
         result << getCurrentMedia() 
+        result << getXState()
         result.flatten()
     }else{
         log.trace "Refresh skipped"
@@ -430,6 +506,10 @@ def tileSetLevel(val)
 def setDoNotDisturb(val)
 {
 	sendEvent(name:"doNotDisturb",value:val,isStateChange:true)
+}
+def setBtnMode(val)
+{
+	sendEvent(name:"btnMode",value:val,isStateChange:true)
 }
 
 // Always sets only this level
@@ -486,6 +566,23 @@ def previousTrack() {
 	mediaRendererAction("Previous")
 }
 
+def nextStation() {
+	playStation(1,0)
+}
+
+def previousStation() {
+	playStation(-1,0)
+}
+
+def nextGenre() {
+    playStation(0,1)
+}
+
+def previousGenre() {
+	playStation(0,-1)
+}
+
+
 def seek(trackNumber) {
 	mediaRendererAction("Seek", "AVTransport", getDataValue("avtcurl") , [InstanceID:0, Unit:"TRACK_NR", Target:trackNumber])
 }
@@ -521,6 +618,21 @@ def switchDoNotDisturb(){
 			setDoNotDisturb("off")
 	}
 }
+def switchBtnMode(){
+    switch(device.currentValue("btnMode")) {
+        case "normal":
+			setBtnMode("station")
+            break
+        case "station":
+			setBtnMode("genre")
+            break
+		case "genre":
+			setBtnMode("normal")
+            break
+		default:
+			setBtnMode("station")
+	}
+}
 
 
 def playByMode(uri, duration, volume,newTrack,mode) {
@@ -552,20 +664,19 @@ def playByMode(uri, duration, volume,newTrack,mode) {
             uri = uri +  ( uri.contains("?") ? "&":"?") + "ts=$eventTime"
 
             result << mediaRendererAction("Stop")
-            result << delayAction(1000 + actionsDelayTime)
-            
+            result << delayAction(delayControl(1000) + actionsDelayTime)
 
             if (level && (currentVolume != level )) {
                 //if(actionsDelayTime > 0){result << delayAction(actionsDelayTime)}
                 result << setVolume(level)
-				result << delayAction(2200 + actionsDelayTime)
+				result << delayAction(delayControl(2200) + actionsDelayTime)
 			}
             if (currentPlayMode != "NORMAL") {
                 result << setPlayMode("NORMAL")
-                result << delayAction(2000 + actionsDelayTime)
+                result << delayAction(delayControl(2000) + actionsDelayTime)
 			}
 			result << setTrack(uri)
-			result << delayAction(2000 + actionsDelayTime)
+			result << delayAction(delayControl(2000) + actionsDelayTime)
 			result << mediaRendererAction("Play")
 			if (duration < 2){
 				def matcher = uri =~ /[^\/]+.mp3/
@@ -579,19 +690,19 @@ def playByMode(uri, duration, volume,newTrack,mode) {
 		if (track ) {
 
             result << mediaRendererAction("Stop")
-            result << delayAction(1000 + actionsDelayTime)
+            result << delayAction(delayControl(1000) + actionsDelayTime)
 
             if (level && restoreVolume ) {
                 result << setVolume(currentVolume)
-                result << delayAction(2200 + actionsDelayTime)
+                result << delayAction(delayControl(2200) + actionsDelayTime)
 			}
             if (currentPlayMode != "NORMAL") {
                 result << setPlayMode(currentPlayMode)
-                result << delayAction(2000 + actionsDelayTime)
+                result << delayAction(delayControl(2000) + actionsDelayTime)
 			}
 			if (!track.uri.startsWith("http://127.0.0.1")){
 				result << setTrack(track)
-				result << delayAction(2000 + actionsDelayTime)
+				result << delayAction(delayControl(2000) + actionsDelayTime)
 			}
 			if (playTrack) {
 				if (!track.uri.startsWith("http://127.0.0.1")){
@@ -644,27 +755,30 @@ def playTrack(String uri, metaData="") {
     def actionsDelayTime =  actionsDelay ? (actionsDelay as Integer) * 1000 :0
     def result = []
 
-    result << mediaRendererAction("Stop")
-    result << delayAction(1000 + actionsDelayTime)
+  //  result << mediaRendererAction("Stop")
+  //  result << delayAction(100 + actionsDelayTime)
     result << setTrack(uri, metaData)
-    result << delayAction(2000 + actionsDelayTime)
+   result << delayAction(1000 + actionsDelayTime)
     result << mediaRendererAction("Play")
-    if (!state.lastChange){
+/*    if (!state.lastChange){
     	result << delayAction(2000 + actionsDelayTime)
     	result << getCurrentMedia()
-    }
+    }*/
 	result.flatten()
 }
 
 def playTrack(Map trackData) {
 	def result = []
     result << setTrack(trackData)
+    result << delayAction(1000 + actionsDelayTime)
 	result << mediaRendererAction("Play")
     if (!state.lastChange){
         result << getCurrentMedia()
     }
 	result.flatten()
 }
+
+
 
 def setTrack(Map trackData) {
 	setTrack(trackData.uri, trackData?.metaData)
@@ -673,9 +787,9 @@ def setTrack(Map trackData) {
 def setTrack(String uri, metaData="")
 {
 	//metaData = metaData?:"<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\"><item id=\"1\" parentID=\"1\" restricted=\"1\"><upnp:class>object.item.audioItem.musicTrack</upnp:class><upnp:album>SmartThings Catalog</upnp:album><upnp:artist>SmartThings</upnp:artist><upnp:albumArtURI>https://graph.api.smartthings.com/api/devices/icons/st.Entertainment.entertainment2-icn?displaySize=2x</upnp:albumArtURI><dc:title>SmartThings Message</dc:title><res protocolInfo=\"http-get:*:audio/mpeg:DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01500000000000000000000000000000\" >${groovy.xml.XmlUtil.escapeXml(uri)} </res></item> </DIDL-Lite>"
-    metaData = metaData?:cleanUri("<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\"><item id=\"1\" parentID=\"1\" restricted=\"1\"><upnp:class>object.item.audioItem.audioBroadcast</upnp:class><upnp:album>SmartThings Catalog</upnp:album><upnp:artist>SmartThings</upnp:artist><upnp:albumArtURI>https://graph.api.smartthings.com/api/devices/icons/st.Entertainment.entertainment2-icn?displaySize=2x</upnp:albumArtURI><dc:title>SmartThings Message</dc:title><res protocolInfo=\"http-get:*:audio/mpeg:*\" >${groovy.xml.XmlUtil.escapeXml(uri)} </res></item> </DIDL-Lite>")
-    metaData = removeAccents(metaData)
-    metaData = new String(metaData.getBytes("ASCII"), "UTF-8")
+  //  metaData = metaData?:cleanUri("<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\"><item id=\"1\" parentID=\"1\" restricted=\"1\"><upnp:class>object.item.audioItem.audioBroadcast</upnp:class><upnp:album>SmartThings Catalog</upnp:album><upnp:artist>SmartThings</upnp:artist><upnp:albumArtURI>https://graph.api.smartthings.com/api/devices/icons/st.Entertainment.entertainment2-icn?displaySize=2x</upnp:albumArtURI><dc:title>SmartThings Message</dc:title><res protocolInfo=\"http-get:*:audio/mpeg:*\" >${groovy.xml.XmlUtil.escapeXml(uri)} </res></item> </DIDL-Lite>")
+   // metaData = removeAccents(metaData)
+   // metaData = new String(metaData.getBytes("ASCII"), "UTF-8")
     mediaRendererAction("SetAVTransportURI", [InstanceID:0, CurrentURI:cleanUri(uri),CurrentURIMetaData:cleanUri(metaData)])
 }
 
@@ -695,7 +809,7 @@ def restoreTrack(Map trackData = null) {
 		data = device.currentState("trackData")?.jsonValue
 	}
 	if (data) {
-		result << mediaRendererAction("SetAVTransportURI", [InstanceID:0, CurrentURI:cleanUri(data.uri), CurrentURIMetaData:cleanUri(data.metaData)])
+		result << mediaRendererAction("SetAVTransportURI", [InstanceID:0, CurrentURI:cleanUri(data.uri), CurrentURIMetaData:cleanXML(cleanUri(data.metaData))])
 	}
 	else {
 		log.warn "Previous track data not found"
@@ -704,8 +818,14 @@ def restoreTrack(Map trackData = null) {
 }
 
 def playText(String msg) {
-	def result = setText(msg)
-	result << mediaRendererAction("Play")
+	if (msg?.startsWith("cmd:")){
+    
+    
+    }else{
+        def result = setText(msg)
+        result << mediaRendererAction("Play")
+    }
+
 }
 
 def setText(String msg) {
@@ -725,6 +845,10 @@ def subscribe() {
 	result << delayAction(2500)
 	result << subscribeAction(getDataValue("avteurl"))
 	result << delayAction(2500)
+    if (getDataValue("peurl")){
+    	result << subscribeAction(getDataValue("peurl"))
+        result << delayAction(2500)
+    }
 	result
 }
 def unsubscribe() {
@@ -794,9 +918,10 @@ private mediaRendererAction(String action, Map body) {
 }
 
 private mediaRendererAction(String action, String service, String path, Map body = [InstanceID:0, Speed:1]) {
+    def urn = service.contains("Party")?"urn:schemas-sony-com:service:$service:1":"urn:schemas-upnp-org:service:$service:1"
     def result = new physicalgraph.device.HubSoapAction(
 		path:    path ?: "/MediaRenderer/$service/Control",
-		urn:     "urn:schemas-upnp-org:service:$service:1",
+		urn:     urn,
 		action:  action,
 		body:    body,
 		headers: [Host:getHostAddress(), CONNECTION: "close"]
@@ -807,6 +932,7 @@ private mediaRendererAction(String action, String service, String path, Map body
 private subscribeAction(path, callbackPath="") {
 	def address = getCallBackAddress()
 	def ip = getHostAddress()
+
 	def result = new physicalgraph.device.HubAction(
 		method: "SUBSCRIBE",
 		path: path,
@@ -860,9 +986,11 @@ private statusText(s) {
 		case "STOPPED":
 			return "stopped"
 		case "NO_MEDIA_PRESENT":
-			return "no_media_present"
+        	return "no_media_present"
         case "NO_DEVICE_PRESENT":
-        	retun "no_device_present"
+        	return "no_device_present"
+         case "LISTENING":
+        	return "no_media_present_listening"
 		default:
 			return s
 	}
@@ -901,7 +1029,18 @@ private hex(value, width=2) {
 	}
 	s
 }
-
+private cleanXML(xml){
+    try {
+        if (xml){
+            def parsedXML = parseXml(xml)
+        }
+    }catch (e) {
+        log.debug "Error when parsing XML : " + e
+        log.debug metaData
+        xml=""
+    }
+    xml
+}
 private cleanUri(uri) {
     def model = getDataValue("model")
     if (uri){
@@ -925,6 +1064,10 @@ private textToSpeechT(message){
     }else{
     	[uri: "https://s3.amazonaws.com/smartapp-media/tts/633e22db83b7469c960ff1de955295f57915bd9a.mp3", duration: "10"]
     }
+}
+
+private delayControl(time){
+	noDelay?0:time
 }
 
 private safeTextToSpeech(message) {
@@ -954,4 +1097,134 @@ private removeAccents(String s) {
     s = s.replaceAll("Ç","C");
 
     return s;
+}
+
+
+def getGenres(){
+	["<<<  Alternative  >>>","Adult Alternative","Britpop","Classic Alternative","College","Dancepunk","Dream Pop","Emo","Goth","Grunge","Hardcore","Indie Pop","Indie Rock","Industrial","LoFi","Modern Rock","New Wave","Noise Pop","Post Punk","Power Pop","Punk","Ska","Xtreme","<<<  Blues  >>>","Acoustic Blues","Cajun and Zydeco","Chicago Blues","Contemporary Blues","Country Blues","Delta Blues","Electric Blues","<<<  Classical  >>>","Baroque","Chamber","Choral","Classical Period","Early Classical","Impressionist","Modern","Opera","Piano","Romantic","Symphony","<<<  Country  >>>","Alt Country","Americana","Bluegrass","Classic Country","Contemporary Bluegrass","Contemporary Country","Honky Tonk","Hot Country Hits","Western","<<<  Decades  >>>","00s","30s","40s","50s","60s","70s","80s","90s","<<<  Easy Listening  >>>","Exotica","Light Rock","Lounge","Orchestral Pop","Polka","Space Age Pop","<<<  Electronic  >>>","Acid House","Ambient","Big Beat","Breakbeat","Dance","Demo","Disco","Downtempo","Drum and Bass","Dubstep","Electro","Garage","Hard House","House","IDM","Jungle","Progressive","Techno","Trance","Tribal","Trip Hop","<<<  Folk  >>>","Alternative Folk","Contemporary Folk","Folk Rock","New Acoustic","Old Time","Traditional Folk","World Folk","<<<  Inspirational  >>>","Christian","Christian Metal","Christian Rap","Christian Rock","Classic Christian","Contemporary Gospel","Gospel","Praise and Worship","Sermons and Services","Southern Gospel","Traditional Gospel","<<<  International  >>>","African","Afrikaans","Arabic","Asian","Bollywood","Brazilian","Caribbean","Celtic","Chinese","Creole","European","Filipino","French","German","Greek","Hawaiian and Pacific","Hebrew","Hindi","Indian","Islamic","Japanese","Klezmer","Korean","Mediterranean","Middle Eastern","North American","Russian","Soca","South American","Tamil","Turkish","Worldbeat","Zouk","<<<  Jazz  >>>","Acid Jazz","Avant Garde","Big Band","Bop","Classic Jazz","Cool Jazz","Fusion","Hard Bop","Latin Jazz","Smooth Jazz","Swing","Vocal Jazz","World Fusion","<<<  Latin  >>>","Bachata","Banda","Bossa Nova","Cumbia","Flamenco","Latin Dance","Latin Pop","Latin Rap and Hip Hop","Latin Rock","Mariachi","Merengue","Ranchera","Reggaeton","Regional Mexican","Salsa","Samba","Tango","Tejano","Tropicalia","<<<  Metal  >>>","Black Metal","Classic Metal","Death Metal","Extreme Metal","Grindcore","Hair Metal","Heavy Metal","Metalcore","Power Metal","Progressive Metal","Rap Metal","Thrash Metal","<<<  Misc  >>>","<<<  New Age  >>>","Environmental","Ethnic Fusion","Healing","Meditation","Spiritual","<<<  Pop  >>>","Adult Contemporary","Barbershop","Bubblegum Pop","Dance Pop","Idols","JPOP","KPOP","Oldies","Soft Rock","Teen Pop","Top 40","World Pop","<<<  Public Radio  >>>","College","News","Sports","Talk","Weather","<<<  R&B and Urban  >>>","Classic R&B","Contemporary R&B","Doo Wop","Funk","Motown","Neo Soul","Quiet Storm","Soul","Urban Contemporary","<<<  Rap  >>>","Alternative Rap","Dirty South","East Coast Rap","Freestyle","Gangsta Rap","Hip Hop","Mixtapes","Old School","Turntablism","Underground Hip Hop","West Coast Rap","<<<  Reggae  >>>","Contemporary Reggae","Dancehall","Dub","Pop Reggae","Ragga","Reggae Roots","Rock Steady","<<<  Rock  >>>","Adult Album Alternative","British Invasion","Celtic Rock","Classic Rock","Garage Rock","Glam","Hard Rock","Jam Bands","JROCK","Piano Rock","Prog Rock","Psychedelic","Rock & Roll","Rockabilly","Singer and Songwriter","Surf","<<Seasonal and Holiday>>","Anniversary","Birthday","Christmas","Halloween","Hanukkah","Honeymoon","Kwanzaa","Valentine","Wedding","Winter","<<<  Soundtracks  >>>","Anime","Kids","Original Score","Showtunes","Video Game Music","<<<  Talk  >>>","BlogTalk","Comedy","Community","Educational","Government","News","Old Time Radio","Other Talk","Political","Scanner","Spoken Word","Sports","Technology","<<<  Themes  >>>","Adult","Best Of","Chill","Eclectic","Experimental","Female","Heartache","Instrumental","LGBT","Love and Romance","Party Mix","Patriotic","Rainy Day Mix","Reality","Sexy","Shuffle","Travel Mix","Tribute","Trippy","Work Mix"]
+}
+
+def playStation(incStatation = 0, incGenre = 0){
+    def genre
+    if (settings["useGenres"]){
+        if (state.selectedGenres != settings["genres"]){
+            state.selectedGenres = settings["genres"]
+            state.genres = []
+            settings["genres"]?.tokenize(",").each{item ->
+				if (getGenres().collect{it.replaceAll(/<|>|  /, "").trim().toLowerCase()}.contains(item.trim().toLowerCase())){
+                    state.genres << item.trim()
+                }
+            }
+			log.trace "Genres parsed ${state.genres}"
+        }
+        if (incGenre == 1 || incGenre == -1) Collections.rotate(state.genres, -incGenre)
+        genre = state.genres[0]
+    }else{
+        genre = settings["genre"]
+    }
+
+        
+	if (genre){
+          def stations = getStationGenre(genre)
+        if (stations){
+
+            if (incStatation == 1 || incStatation == -1) Collections.rotate(state[genre], -incStatation)
+            def stationUri = getUriStation(stations[0].keySet()[0])  //"x-rincon-mp3radio://listen.radionomy.com/${radionomyStations[station[0]].key[0]}"
+			playTrack(stationUri,"<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\"><item id=\"1\" parentID=\"1\" restricted=\"1\"><upnp:class>object.item.audioItem.audioBroadcast</upnp:class><upnp:album>${groovy.xml.XmlUtil.escapeXml(genre)}</upnp:album><upnp:artist>SHOUTcast</upnp:artist><upnp:albumArtURI>http://www.radionomygroup.com/img/shoutcast-logo.png</upnp:albumArtURI><dc:title>${groovy.xml.XmlUtil.escapeXml(stations[0].values().n[0])}</dc:title><res protocolInfo=\"http-get:*:audio/mpeg:DLNA.ORG_PN=MP3;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01500000000000000000000000000000\" >${groovy.xml.XmlUtil.escapeXml(stationUri)} </res></item> </DIDL-Lite>")
+        }
+    }
+}
+
+def getUriStation(id){
+    def  uri
+    def params = [
+            uri: "http://www.shoutcast.com/Player/GetStreamUrl",
+            body: [ station: id],
+            contentType: "text/plain",
+        ]
+        try {
+            httpPost(params) { resp ->
+                uri = resp.data.text
+               if (uri){
+                uri =  uri.replaceAll("\"","");
+               }
+            }
+        } catch (ex) {
+            log.debug "something went wrong: $ex"
+        }
+	uri
+}
+
+def getStationGenre(genre){
+    if (genre){
+        if(!state[genre] || state[genre]?.size() == 0 ){
+            state[genre] = []
+                try {
+                def params = [
+                    uri: "http://www.shoutcast.com/Home/BrowseByGenre",
+                    body: [
+                        genrename: genre
+                    ]
+                ]
+                httpPostJson(params)  { resp ->
+                     resp.data.any { element ->
+                        if (!element.IsRadionomy && !element.AACEnabled && element.Bitrate == 128 ){
+                            state[genre] << ["${element.ID}":[n:"${element.Name}",a:""]]
+                        }
+                        if (state[genre].size() >=10 ){
+                            return true // break
+                        }
+                    }
+                }
+            } catch (ex) {
+                log.debug "something went wrong: $ex"
+            }
+        }
+        state[genre]
+    }else{
+    	[]
+    }
+}
+
+def getXState()
+{
+	mediaRendererAction("X_GetState", "Party", "/Party_Control", [:])
+}
+def refreshParty(delay){
+	def result = []
+    def actionsDelayTime =  delay ? (delay as Integer) * 1000 :0
+    result << delayAction(actionsDelayTime)
+    result << getXState()
+    result.flatten()
+}
+
+def party(list){
+    def pList = ""
+    def result = []
+    def actionsDelayTime =  actionsDelay ? (actionsDelay as Integer) * 1000 :0
+     
+    if (list){
+		def nList = list.split(",") as List
+       
+    	if (nList.contains(device.currentValue("udn")))  nList.remove(device.currentValue("udn")) 
+        if (device.currentValue("partyState")=="SINGING"){
+            def cList = device.currentValue("listenerList").split(",")  as List
+            def iList = nList.intersect(cList)
+            nList = nList - iList
+            def rList = cList - iList
+            if(nList && getDataValue("pcurl")) result << mediaRendererAction("X_Entry", "Party",getDataValue("pcurl") , [SingerSessionID:device.currentValue("sessionID"),ListenerList:nList.join(",")])
+            result << delayAction(1000 + actionsDelayTime)
+            if(rList && getDataValue("pcurl")) result << mediaRendererAction("X_Leave", "Party",getDataValue("pcurl") , [SingerSessionID:device.currentValue("sessionID"),ListenerList:rList.join(",")])
+           
+        }else{
+        	if (nList && getDataValue("pcurl")) result << mediaRendererAction("X_Start", "Party",getDataValue("pcurl") , [PartyMode:"PARTY",ListenerList:nList.join(",")])
+        }
+    }else{
+    	if(device.currentValue("partyState")=="SINGING"  && getDataValue("pcurl")) 	result << mediaRendererAction("X_Abort", "Party",getDataValue("pcurl") , [SingerSessionID:device.currentValue("sessionID")])
+
+    }
+    if (result){
+     	parent.getGXState()
+        result.flatten()
+    }
 }
